@@ -164,7 +164,7 @@ func main() {
     flag.Parse()
     if len(os.Args) != 4 {
         flag.Usage()
-        return
+        os.Exit(1)
     }
     
     var repos_api = bb_base_url + "/repositories/" + bitbucket_owner_name
@@ -175,7 +175,7 @@ func main() {
         json_response, err := getJSON(repos_api)
         if err != nil {
             fmt.Println(err)
-            return
+			os.Exit(1)
         }
         
         repos := json_response["values"]
