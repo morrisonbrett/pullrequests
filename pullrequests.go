@@ -175,7 +175,7 @@ func main() {
         json_response, err := getJSON(repos_api)
         if err != nil {
             fmt.Println(err)
-			os.Exit(1)
+            os.Exit(1)
         }
         
         repos := json_response["values"]
