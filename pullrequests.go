@@ -16,7 +16,7 @@ import (
 )
 
 // Setup the Authentication info
-const bbBaseUrl = "https://bitbucket.org/api/2.0"
+const bbBaseURL = "https://bitbucket.org/api/2.0"
 
 var bitbucketOwnerName string
 var bitbucketUserName string
@@ -25,31 +25,31 @@ var bitbucketPassword string
 //
 // Given a BB API, return JSON as a map interface
 //
-func getJSON(url string) (map[string]interface{}, error) {
+func getJSON(URL string) (map[string]interface{}, error) {
 	client := &http.Client{}
-	req, err := http.NewRequest("GET", url, nil)
+	req, err := http.NewRequest("GET", URL, nil)
 	if err != nil {
-		return nil, errors.New(fmt.Sprintf("Request Error: %s", err))
+		return nil, errors.New(fmt.Sprintf("request error: %s", err))
 	}
 
 	req.SetBasicAuth(bitbucketUserName, bitbucketPassword)
 
 	res, err := client.Do(req)
 	if err != nil {
-		return nil, errors.New(fmt.Sprintf("Request Error: %s", err))
+		return nil, errors.New(fmt.Sprintf("request error: %s", err))
 	}
 
 	defer res.Body.Close()
 
 	if res.StatusCode != 200 {
-		return nil, errors.New(fmt.Sprintf("Response Code: %d", res.StatusCode))
+		return nil, errors.New(fmt.Sprintf("response code: %d", res.StatusCode))
 	}
 
 	var dat interface{}
 
 	decoder := json.NewDecoder(res.Body)
 	if err := decoder.Decode(&dat); err == io.EOF {
-		return nil, errors.New(fmt.Sprintf("Decode Error: %s", err))
+		return nil, errors.New(fmt.Sprintf("decode error: %s", err))
 	}
 
 	jsonResponse := dat.(map[string]interface{})
@@ -57,7 +57,7 @@ func getJSON(url string) (map[string]interface{}, error) {
 	return jsonResponse, nil
 }
 
-func displayParticipantInfo(id int, selfHrefLink string) error {
+func displayParticipantInfo(ID int, selfHrefLink string) error {
 	// Get more details about the PR
 	jsonResponseDet, err := getJSON(selfHrefLink)
 	if err != nil {
@@ -104,20 +104,20 @@ func displayParticipantInfo(id int, selfHrefLink string) error {
 		isOrNot = "IS"
 	}
 
-	fmt.Printf("    #%d %s READY TO MERGE, %d of %d REVIEWERS APPROVED\n\n", id, isOrNot, numApprovedReviewers, numReviewers)
+	fmt.Printf("    #%d %s READY TO MERGE, %d of %d REVIEWERS APPROVED\n\n", ID, isOrNot, numApprovedReviewers, numReviewers)
 
 	return nil
 }
 
 //
-// Given a PR url, iterate through state and print info
+// Given a PR URL, iterate through state and print info
 //
 func listPR(pullRequestsLink string) error {
-	var prApi = pullRequestsLink
+	var prAPI = pullRequestsLink
 
 	// PR API has pagination, code for > 1 page
-	for len(prApi) > 0 {
-		jsonResponse, err := getJSON(prApi)
+	for len(prAPI) > 0 {
+		jsonResponse, err := getJSON(prAPI)
 		if err != nil {
 			return err
 		}
@@ -128,11 +128,11 @@ func listPR(pullRequestsLink string) error {
 		// For each PR in the repo
 		for _, value := range prsI {
 			valueMap := value.(map[string]interface{})
-			id := int(valueMap["id"].(float64))
+			ID := int(valueMap["id"].(float64))
 
 			// Display base info about the PR
 			fmt.Printf("    #%d %s (%s -> %s) by %s\n",
-				id,
+				ID,
 				valueMap["title"],
 				valueMap["source"].(map[string]interface{})["branch"].(map[string]interface{})["name"],
 				valueMap["destination"].(map[string]interface{})["branch"].(map[string]interface{})["name"],
@@ -145,7 +145,7 @@ func listPR(pullRequestsLink string) error {
 			selfHrefLink := fmt.Sprint(selfHref)
 
 			// Display participant details about the PR
-			err := displayParticipantInfo(id, selfHrefLink)
+			err := displayParticipantInfo(ID, selfHrefLink)
 			if err != nil {
 				return err
 			}
@@ -154,9 +154,9 @@ func listPR(pullRequestsLink string) error {
 		// Determine if there's more results - if so, loop control back
 		next := jsonResponse["next"]
 		if next != nil {
-			prApi = fmt.Sprint(next)
+			prAPI = fmt.Sprint(next)
 		} else {
-			prApi = ""
+			prAPI = ""
 		}
 	}
 
@@ -177,12 +177,12 @@ func main() {
 		os.Exit(1)
 	}
 
-	var reposApi = bbBaseUrl + "/repositories/" + bitbucketOwnerName
+	var reposAPI = bbBaseURL + "/repositories/" + bitbucketOwnerName
 
 	// Repo API has pagination, code for > 1 page
-	for len(reposApi) > 0 {
+	for len(reposAPI) > 0 {
 		// Get the list of repos for this user / group
-		jsonResponse, err := getJSON(reposApi)
+		jsonResponse, err := getJSON(reposAPI)
 		if err != nil {
 			fmt.Println(err)
 			os.Exit(1)
@@ -209,9 +209,9 @@ func main() {
 		// Determine if there's more results - if so, loop control back
 		next := jsonResponse["next"]
 		if next != nil {
-			reposApi = fmt.Sprint(next)
+			reposAPI = fmt.Sprint(next)
 		} else {
-			reposApi = ""
+			reposAPI = ""
 		}
 	}
 }
