@@ -57,6 +57,58 @@ func getJSON(url string) (map[string]interface{}, error) {
     return jsonResponse, nil
 }
 
+func displayParticipantInfo(id int, selfHrefLink string) (error) {
+    // Get more details about the PR
+    jsonResponseDet, err := getJSON(selfHrefLink)
+    if err != nil {
+        return err
+    }
+    
+    // Get details about the participants
+    prsDet := jsonResponseDet["participants"]
+    prsDetI := prsDet.([]interface{})
+
+    // For determining if the PR is ready to merge
+    numApprovedReviewers := 0
+    numReviewers := 0
+    
+    // For each participant in the PR, display state depending on role
+    for _, value := range prsDetI {
+        valueMap := value.(map[string]interface{})
+        role := valueMap["role"]
+        approved := valueMap["approved"] == true
+        displayName := valueMap["user"].(map[string]interface{})["display_name"]
+        
+        // TODO Rewrite with one line RegEx?
+        var approvedS = " "
+        if approved {
+            approvedS = "X"
+        }
+
+        switch (role) {
+            case "REVIEWER":
+                fmt.Printf("        %s %s\n", approvedS, displayName)
+                numReviewers++
+                if (approved) {
+                    numApprovedReviewers++
+                }
+            case "PARTICIPANT":
+                fmt.Printf("        %s (%s)\n", approvedS, displayName)
+            default:
+                fmt.Printf("        %s %s (%s)\n", approvedS, displayName, role)
+        }
+    }
+
+    var isOrNot = "IS NOT"
+    if numReviewers > 0 && numReviewers == numApprovedReviewers {
+        isOrNot = "IS"
+    }
+
+    fmt.Printf("    #%d %s READY TO MERGE, %d of %d REVIEWERS APPROVED\n\n", id, isOrNot, numApprovedReviewers, numReviewers)
+    
+    return nil
+}
+
 //
 // Given a PR url, iterate through state and print info
 //
@@ -76,10 +128,10 @@ func listPR(pullRequestsLink string) (error) {
         // For each PR in the repo
         for _, value := range prsI {
             valueMap := value.(map[string]interface{})
-            id := valueMap["id"]
+            id := int(valueMap["id"].(float64))
             
             // Display base info about the PR
-            fmt.Printf("    #%.0f %s (%s -> %s) by %s\n",
+            fmt.Printf("    #%d %s (%s -> %s) by %s\n",
                 id,
                 valueMap["title"],
                 valueMap["source"].(map[string]interface{})["branch"].(map[string]interface{})["name"],
@@ -92,53 +144,11 @@ func listPR(pullRequestsLink string) (error) {
             selfHref := self.(map[string]interface{})["href"]
             selfHrefLink := fmt.Sprint(selfHref)
     
-            // Get more details about the PR
-            jsonResponseDet, err := getJSON(selfHrefLink)
-            if err != nil {
+            // Display participant details about the PR    
+            err := displayParticipantInfo(id, selfHrefLink)
+            if (err != nil) {
                 return err
             }
-            
-            // Get details about the participants
-            prsDet := jsonResponseDet["participants"]
-            prsDetI := prsDet.([]interface{})
-    
-            // For determining if the PR is ready to merge
-            numApprovedReviewers := 0
-            numReviewers := 0
-            
-            // For each participant in the PR, display state depending on role
-            for _, value := range prsDetI {
-                valueMap := value.(map[string]interface{})
-                role := valueMap["role"]
-                approved := valueMap["approved"] == true
-                displayName := valueMap["user"].(map[string]interface{})["display_name"]
-                
-                // TODO Rewrite with one line RegEx?
-                var approvedS = " "
-                if approved {
-                    approvedS = "X"
-                }
-    
-                switch (role) {
-                    case "REVIEWER":
-                        fmt.Printf("        %s %s\n", approvedS, displayName)
-                        numReviewers++
-                        if (approved) {
-                            numApprovedReviewers++
-                        }
-                    case "PARTICIPANT":
-                        fmt.Printf("        %s (%s)\n", approvedS, displayName)
-                    default:
-                        fmt.Printf("        %s %s (%s)\n", approvedS, displayName, role)
-                }
-            }
-    
-            var isOrNot = "IS NOT"
-            if numReviewers > 0 && numReviewers == numApprovedReviewers {
-                isOrNot = "IS"
-            }
-    
-            fmt.Printf("    #%.0f %s READY TO MERGE, %d of %d REVIEWERS APPROVED\n\n", id, isOrNot, numApprovedReviewers, numReviewers)
         }
 
         // Determine if there's more results - if so, loop control back
