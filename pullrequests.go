@@ -29,27 +29,27 @@ func getJSON(URL string) (map[string]interface{}, error) {
 	client := &http.Client{}
 	req, err := http.NewRequest("GET", URL, nil)
 	if err != nil {
-		return nil, errors.New(fmt.Sprintf("request error: %s", err))
+		return nil, fmt.Errorf("request error: %s", err)
 	}
 
 	req.SetBasicAuth(bitbucketUserName, bitbucketPassword)
 
 	res, err := client.Do(req)
 	if err != nil {
-		return nil, errors.New(fmt.Sprintf("request error: %s", err))
+		return nil, fmt.Errorf("request error: %s", err)
 	}
 
 	defer res.Body.Close()
 
 	if res.StatusCode != 200 {
-		return nil, errors.New(fmt.Sprintf("response code: %d", res.StatusCode))
+		return nil, fmt.Errorf("response code: %d", res.StatusCode)
 	}
 
 	var dat interface{}
 
 	decoder := json.NewDecoder(res.Body)
 	if err := decoder.Decode(&dat); err == io.EOF {
-		return nil, errors.New(fmt.Sprintf("decode error: %s", err))
+		return nil, fmt.Errorf("decode error: %s", err)
 	}
 
 	jsonResponse := dat.(map[string]interface{})
