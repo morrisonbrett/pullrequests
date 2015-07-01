@@ -16,11 +16,11 @@ import (
 )
 
 // Setup the Authentication info
-const bb_base_url = "https://bitbucket.org/api/2.0"
+const bbBaseUrl = "https://bitbucket.org/api/2.0"
 
-var bitbucket_owner_name string
-var bitbucket_username string
-var bitbucket_password string
+var bitbucketOwnerName string
+var bitbucketUserName string
+var bitbucketPassword string
 
 //
 // Given a BB API, return JSON as a map interface
@@ -32,7 +32,7 @@ func getJSON(url string) (map[string]interface{}, error) {
          return nil, errors.New(fmt.Sprintf("Request Error: %s", err))
     }
 
-    req.SetBasicAuth(bitbucket_username, bitbucket_password)
+    req.SetBasicAuth(bitbucketUserName, bitbucketPassword)
 
     res, err := client.Do(req)
     if err != nil {
@@ -52,101 +52,101 @@ func getJSON(url string) (map[string]interface{}, error) {
          return nil, errors.New(fmt.Sprintf("Decode Error: %s", err))
     }
     
-    json_response := dat.(map[string]interface{})
+    jsonResponse := dat.(map[string]interface{})
     
-    return json_response, nil
+    return jsonResponse, nil
 }
 
 //
 // Given a PR url, iterate through state and print info
 //
-func listPR(pull_requests_link string) (error) {
-    var pr_api = pull_requests_link
+func listPR(pullRequestsLink string) (error) {
+    var prApi = pullRequestsLink
     
     // PR API has pagination, code for > 1 page
-    for len(pr_api) > 0 {
-        json_response, err := getJSON(pr_api)
+    for len(prApi) > 0 {
+        jsonResponse, err := getJSON(prApi)
         if err != nil {
             return err
         }
         
-        prs := json_response["values"]
-        prs_i := prs.([]interface{})
+        prs := jsonResponse["values"]
+        prsI := prs.([]interface{})
     
         // For each PR in the repo
-        for _, value := range prs_i {
-            value_map := value.(map[string]interface{})
-            id := value_map["id"]
+        for _, value := range prsI {
+            valueMap := value.(map[string]interface{})
+            id := valueMap["id"]
             
             // Display base info about the PR
             fmt.Printf("    #%.0f %s (%s -> %s) by %s\n",
                 id,
-                value_map["title"],
-                value_map["source"].(map[string]interface{})["branch"].(map[string]interface{})["name"],
-                value_map["destination"].(map[string]interface{})["branch"].(map[string]interface{})["name"],
-                value_map["author"].(map[string]interface{})["display_name"])
+                valueMap["title"],
+                valueMap["source"].(map[string]interface{})["branch"].(map[string]interface{})["name"],
+                valueMap["destination"].(map[string]interface{})["branch"].(map[string]interface{})["name"],
+                valueMap["author"].(map[string]interface{})["display_name"])
     
             // Prep the URL for more details about the PR
-            links := value_map["links"]
+            links := valueMap["links"]
             self := links.(map[string]interface{})["self"]
-            self_href := self.(map[string]interface{})["href"]
-            self_href_link := fmt.Sprint(self_href)
+            selfHref := self.(map[string]interface{})["href"]
+            selfHrefLink := fmt.Sprint(selfHref)
     
             // Get more details about the PR
-            json_response_det, err := getJSON(self_href_link)
+            jsonResponseDet, err := getJSON(selfHrefLink)
             if err != nil {
                 return err
             }
             
             // Get details about the participants
-            prs_det := json_response_det["participants"]
-            prs_det_i := prs_det.([]interface{})
+            prsDet := jsonResponseDet["participants"]
+            prsDetI := prsDet.([]interface{})
     
             // For determining if the PR is ready to merge
-            num_approved_reviewers := 0
-            num_reviewers := 0
+            numApprovedReviewers := 0
+            numReviewers := 0
             
             // For each participant in the PR, display state depending on role
-            for _, value := range prs_det_i {
-                value_map := value.(map[string]interface{})
-                role := value_map["role"]
-                approved := value_map["approved"] == true
-                display_name := value_map["user"].(map[string]interface{})["display_name"]
+            for _, value := range prsDetI {
+                valueMap := value.(map[string]interface{})
+                role := valueMap["role"]
+                approved := valueMap["approved"] == true
+                displayName := valueMap["user"].(map[string]interface{})["display_name"]
                 
                 // TODO Rewrite with one line RegEx?
-                var approved_s = " "
+                var approvedS = " "
                 if approved {
-                    approved_s = "X"
+                    approvedS = "X"
                 }
     
                 switch (role) {
                     case "REVIEWER":
-                        fmt.Printf("        %s %s\n", approved_s, display_name)
-                        num_reviewers++
+                        fmt.Printf("        %s %s\n", approvedS, displayName)
+                        numReviewers++
                         if (approved) {
-                            num_approved_reviewers++
+                            numApprovedReviewers++
                         }
                     case "PARTICIPANT":
-                        fmt.Printf("        %s (%s)\n", approved_s, display_name)
+                        fmt.Printf("        %s (%s)\n", approvedS, displayName)
                     default:
-                        fmt.Printf("        %s %s (%s)\n", approved_s, display_name, role)
+                        fmt.Printf("        %s %s (%s)\n", approvedS, displayName, role)
                 }
             }
     
-            var is_or_not = "IS NOT"
-            if num_reviewers > 0 && num_reviewers == num_approved_reviewers {
-                is_or_not = "IS"
+            var isOrNot = "IS NOT"
+            if numReviewers > 0 && numReviewers == numApprovedReviewers {
+                isOrNot = "IS"
             }
     
-            fmt.Printf("    #%.0f %s READY TO MERGE, %d of %d REVIEWERS APPROVED\n\n", id, is_or_not, num_approved_reviewers, num_reviewers)
+            fmt.Printf("    #%.0f %s READY TO MERGE, %d of %d REVIEWERS APPROVED\n\n", id, isOrNot, numApprovedReviewers, numReviewers)
         }
 
         // Determine if there's more results - if so, loop control back
-        next := json_response["next"]
+        next := jsonResponse["next"]
         if next != nil {
-            pr_api = fmt.Sprint(next)
+            prApi = fmt.Sprint(next)
         } else {
-            pr_api = ""
+            prApi = ""
         }
     }
     
@@ -154,9 +154,9 @@ func listPR(pull_requests_link string) (error) {
 }
 
 func init() {
-    flag.StringVar(&bitbucket_owner_name, "ownername", "", "Bitbucket repository owner account")
-    flag.StringVar(&bitbucket_username, "username", "", "Bitbucket account username")
-    flag.StringVar(&bitbucket_password, "password", "", "Bitbucket account password")
+    flag.StringVar(&bitbucketOwnerName, "ownername", "", "Bitbucket repository owner account")
+    flag.StringVar(&bitbucketUserName, "username", "", "Bitbucket account username")
+    flag.StringVar(&bitbucketPassword, "password", "", "Bitbucket account password")
 }
 
 func main() {
@@ -167,41 +167,41 @@ func main() {
         os.Exit(1)
     }
     
-    var repos_api = bb_base_url + "/repositories/" + bitbucket_owner_name
+    var reposApi = bbBaseUrl + "/repositories/" + bitbucketOwnerName
     
     // Repo API has pagination, code for > 1 page
-    for len(repos_api) > 0 {
+    for len(reposApi) > 0 {
         // Get the list of repos for this user / group
-        json_response, err := getJSON(repos_api)
+        jsonResponse, err := getJSON(reposApi)
         if err != nil {
             fmt.Println(err)
             os.Exit(1)
         }
         
-        repos := json_response["values"]
-        repos_i := repos.([]interface{})
+        repos := jsonResponse["values"]
+        reposI := repos.([]interface{})
         
         // For each repo, get the PR URL and process
-     	for _, value := range repos_i {
+     	for _, value := range reposI {
             links := value.(map[string]interface{})["links"]
-            pullrequests := links.(map[string]interface{})["pullrequests"]
-            pullrequests_href := pullrequests.(map[string]interface{})["href"]
+            pullRequests := links.(map[string]interface{})["pullrequests"]
+            pullRequestsHref := pullRequests.(map[string]interface{})["href"]
     
-            pull_requests_link := fmt.Sprint(pullrequests_href)
-            fmt.Println("Repo:", pull_requests_link)
+            pullRequestsLink := fmt.Sprint(pullRequestsHref)
+            fmt.Println("Repo:", pullRequestsLink)
     
-            err := listPR(pull_requests_link)
+            err := listPR(pullRequestsLink)
             if err != nil {
                  fmt.Println(err) // OK to continue here if error, no need to exit the program
             }
      	}
         
         // Determine if there's more results - if so, loop control back
-        next := json_response["next"]
+        next := jsonResponse["next"]
         if next != nil {
-            repos_api = fmt.Sprint(next)
+            reposApi = fmt.Sprint(next)
         } else {
-            repos_api = ""
+            reposApi = ""
         }
     }
 }
