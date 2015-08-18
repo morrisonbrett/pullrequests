@@ -168,14 +168,7 @@ func init() {
 	flag.StringVar(&bitbucketPassword, "password", "", "Bitbucket account password")
 }
 
-func main() {
-	// Command line args
-	flag.Parse()
-	if len(os.Args) != 4 {
-		flag.Usage()
-		os.Exit(1)
-	}
-
+func rootRepos(bbOwnername, bbUsername, bbPassword string) error {
 	var reposAPI = bbBaseURL + "/repositories/" + bitbucketOwnerName
 
 	// Repo API has pagination, code for > 1 page
@@ -184,7 +177,7 @@ func main() {
 		jsonResponse, err := getJSON(reposAPI)
 		if err != nil {
 			fmt.Println(err)
-			os.Exit(1)
+			return err
 		}
 
 		repos := jsonResponse["values"]
@@ -212,5 +205,21 @@ func main() {
 		} else {
 			reposAPI = ""
 		}
+	}
+
+	return nil
+}
+
+func main() {
+	// Command line args
+	flag.Parse()
+	if len(os.Args) != 4 {
+		flag.Usage()
+		os.Exit(1)
+	}
+
+	err := rootRepos(bitbucketOwnerName, bitbucketUserName, bitbucketPassword)
+	if err != nil {
+		os.Exit(1)
 	}
 }

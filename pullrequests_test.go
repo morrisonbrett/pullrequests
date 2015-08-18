@@ -6,10 +6,17 @@
 package main
 
 import (
-	"fmt"
+	"github.com/stretchr/testify/assert"
 	"testing"
 )
 
 func TestLaunch(t *testing.T) {
-	fmt.Printf("Hello World\n")
+	t.Logf("Program Launches\n")
+}
+
+func TestFailAuth(t *testing.T) {
+	err := rootRepos("dummyowner", "dummyuser", "dummypassword")
+	if assert.Error(t, err) {
+		t.Logf("Expected Error, Received Error: %s", err)
+	}
 }
