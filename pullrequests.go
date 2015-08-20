@@ -21,62 +21,139 @@ var bitbucketOwnerName string
 var bitbucketUserName string
 var bitbucketPassword string
 
+// RepoResponse ...
+type RepoResponse struct {
+	Repos []Repo `json:"values"`
+	Next  string `json:"next"`
+}
+
+// Repo ...
+type Repo struct {
+	Links Links `json:"links"`
+}
+
+// Links ...
+type Links struct {
+	PullRequests PullRequests `json:"pullrequests"`
+}
+
+// PullRequests ...
+type PullRequests struct {
+	Href string `json:"href"`
+}
+
+// PRResponse ...
+type PRResponse struct {
+	PRs  []PR   `json:"values"`
+	Next string `json:"next"`
+}
+
+// PR ...
+type PR struct {
+	ID          int         `json:"id"`
+	Title       string      `json:"title"`
+	Source      Source      `json:"source"`
+	Destination Destination `json:"destination"`
+	Author      Author      `json:"author"`
+	PRLinks     PRLinks     `json:"links"`
+}
+
+// Destination ...
+type Destination struct {
+	Branch Branch `json:"branch"`
+}
+
+// Source ...
+type Source struct {
+	Branch Branch `json:"branch"`
+}
+
+// Branch ...
+type Branch struct {
+	Name string `json:"name"`
+}
+
+// Author ...
+type Author struct {
+	DisplayName string `json:"display_name"`
+}
+
+// PRLinks ...
+type PRLinks struct {
+	Self Self `json:"self"`
+}
+
+// Self ...
+type Self struct {
+	Href string `json:"href"`
+}
+
+// ParticipantsResponse ...
+type ParticipantsResponse struct {
+	Participants []Participant `json:"participants"`
+}
+
+// Participant ...
+type Participant struct {
+	Role     string `json:"role"`
+	Approved bool   `json:"approved"`
+	User     User   `json:"user"`
+}
+
+// User ...
+type User struct {
+	DisplayName string `json:"display_name"`
+}
+
 //
 // Given a BB API, return JSON as a map interface
 //
-func getJSON(URL string) (map[string]interface{}, error) {
+func getJSON(URL string, v interface{}) error {
 	client := &http.Client{}
 	req, err := http.NewRequest("GET", URL, nil)
 	if err != nil {
-		return nil, fmt.Errorf("request error: %s", err)
+		return fmt.Errorf("request error: %s", err)
 	}
 
 	req.SetBasicAuth(bitbucketUserName, bitbucketPassword)
 
 	res, err := client.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("request error: %s", err)
+		return fmt.Errorf("request error: %s", err)
 	}
 
 	defer res.Body.Close()
 
 	if res.StatusCode != 200 {
-		return nil, fmt.Errorf("response code: %d", res.StatusCode)
+		return fmt.Errorf("response code: %d", res.StatusCode)
 	}
-
-	var dat interface{}
 
 	decoder := json.NewDecoder(res.Body)
-	if err := decoder.Decode(&dat); err == io.EOF {
-		return nil, fmt.Errorf("decode error: %s", err)
+	if err := decoder.Decode(&v); err == io.EOF {
+		return fmt.Errorf("decode error: %s", err)
 	}
 
-	jsonResponse := dat.(map[string]interface{})
-
-	return jsonResponse, nil
+	return nil
 }
 
 func displayParticipantInfo(ID int, selfHrefLink string) error {
+	participantsResponse := ParticipantsResponse{}
+
 	// Get more details about the PR
-	jsonResponseDet, err := getJSON(selfHrefLink)
+	err := getJSON(selfHrefLink, &participantsResponse)
 	if err != nil {
 		return err
 	}
-
-	// Get details about the participants
-	prsDet := jsonResponseDet["participants"]
-	prsDetI := prsDet.([]interface{})
 
 	// For determining if the PR is ready to merge
 	numApprovedReviewers := 0
 	numReviewers := 0
 
 	// For each participant in the PR, display state depending on role
-	for _, value := range prsDetI {
-		valueMap := value.(map[string]interface{})
-		role := valueMap["role"]
-		approved := valueMap["approved"] == true
-		displayName := valueMap["user"].(map[string]interface{})["display_name"]
+	for _, value := range participantsResponse.Participants {
+		role := value.Role
+		approved := value.Approved
+		displayName := value.User.DisplayName
 
 		// TODO Rewrite with one line RegEx?
 		var approvedS = " "
@@ -116,47 +193,36 @@ func listPR(pullRequestsLink string) error {
 
 	// PR API has pagination, code for > 1 page
 	for len(prAPI) > 0 {
-		jsonResponse, err := getJSON(prAPI)
+		pRResponse := PRResponse{}
+
+		err := getJSON(prAPI, &pRResponse)
 		if err != nil {
 			return err
 		}
 
-		prs := jsonResponse["values"]
-		prsI := prs.([]interface{})
-
 		// For each PR in the repo
-		for _, value := range prsI {
-			valueMap := value.(map[string]interface{})
-			ID := int(valueMap["id"].(float64))
-
+		for _, value := range pRResponse.PRs {
 			// Display base info about the PR
 			fmt.Printf("    #%d %s (%s -> %s) by %s\n",
-				ID,
-				valueMap["title"],
-				valueMap["source"].(map[string]interface{})["branch"].(map[string]interface{})["name"],
-				valueMap["destination"].(map[string]interface{})["branch"].(map[string]interface{})["name"],
-				valueMap["author"].(map[string]interface{})["display_name"])
-
+				value.ID,
+				value.Title,
+				value.Source.Branch.Name,
+				value.Destination.Branch.Name,
+				value.Author.DisplayName)
 			// Prep the URL for more details about the PR
-			links := valueMap["links"]
-			self := links.(map[string]interface{})["self"]
-			selfHref := self.(map[string]interface{})["href"]
-			selfHrefLink := fmt.Sprint(selfHref)
+			links := value.PRLinks
+			self := links.Self
+			selfHref := self.Href
 
 			// Display participant details about the PR
-			err := displayParticipantInfo(ID, selfHrefLink)
+			err := displayParticipantInfo(value.ID, selfHref)
 			if err != nil {
 				return err
 			}
 		}
 
-		// Determine if there's more results - if so, loop control back
-		next := jsonResponse["next"]
-		if next != nil {
-			prAPI = fmt.Sprint(next)
-		} else {
-			prAPI = ""
-		}
+		// Determine if there's more results - if so, this assignment will loop control back
+		prAPI = pRResponse.Next
 	}
 
 	return nil
@@ -173,22 +239,21 @@ func rootRepos(bbOwnername, bbUsername, bbPassword string) error {
 
 	// Repo API has pagination, code for > 1 page
 	for len(reposAPI) > 0 {
+		repoResponse := RepoResponse{}
+
 		// Get the list of repos for this user / group
-		jsonResponse, err := getJSON(reposAPI)
+		err := getJSON(reposAPI, &repoResponse)
 		if err != nil {
 			fmt.Println(err)
 			return err
 		}
 
-		repos := jsonResponse["values"]
-		reposI := repos.([]interface{})
-
 		// For each repo, get the PR URL and process
-		for _, value := range reposI {
-			links := value.(map[string]interface{})["links"]
-			pullRequests := links.(map[string]interface{})["pullrequests"]
-			pullRequestsHref := pullRequests.(map[string]interface{})["href"]
-
+		for _, value := range repoResponse.Repos {
+			//fmt.Printf("value: %s\n\n", value)
+			links := value.Links
+			pullRequests := links.PullRequests
+			pullRequestsHref := pullRequests.Href
 			pullRequestsLink := fmt.Sprint(pullRequestsHref)
 			fmt.Println("Repo:", pullRequestsLink)
 
@@ -198,13 +263,8 @@ func rootRepos(bbOwnername, bbUsername, bbPassword string) error {
 			}
 		}
 
-		// Determine if there's more results - if so, loop control back
-		next := jsonResponse["next"]
-		if next != nil {
-			reposAPI = fmt.Sprint(next)
-		} else {
-			reposAPI = ""
-		}
+		// Determine if there's more results - if so, this assignment will loop control back
+		reposAPI = repoResponse.Next
 	}
 
 	return nil
